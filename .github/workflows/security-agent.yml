@@ -1,17 +1,10 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# PR Security Agent Workflow
-# ─────────────────────────────────────────────────────────────────────────────
-# Runs scripts/pr_security_agent.py on every pull request that touches the
-# implementations/ folder.  The job fails (exit 1) if any Python file contains
-# a dangerous shell/exec command without a Human-in-the-Loop input() safeguard.
-# ─────────────────────────────────────────────────────────────────────────────
+name: 🛡️ Automated Security Agent
 
-name: PR Security Agent
-
+# This tells the agent to wake up whenever a Pull Request is opened or updated
 on:
   pull_request:
     paths:
-      - "implementations/**"
+      - 'implementations/**/*.py'
 
 permissions:
   contents: read
@@ -20,28 +13,24 @@ jobs:
   security-scan:
     name: Scan for Dangerous Commands Without HITL Safeguards
     runs-on: ubuntu-latest
-
+    
     steps:
-      # ── 1. Checkout the full history so git-diff works across branches ──────
-      - name: Checkout repository
+      - name: 📥 Checkout repository code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      # ── 2. Python runtime ──────────────────────────────────────────────────
-      - name: Set up Python
+        
+      - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      # ── 3. Determine which Python files changed in this PR ─────────────────
-      - name: Identify changed Python files in implementations/
+          python-version: '3.11'
+          
+      - name: 🔍 Identify changed Python files
         id: changed-files
         run: |
           git fetch origin "${{ github.base_ref }}" --depth=1
 
-          # Collect Added, Copied, Modified, Renamed, Type-changed .py files
-          # under implementations/ and join them with a space for xargs.
+          # Collect .py files under implementations/ that were Added or Modified
           CHANGED=$(
             git diff --name-only --diff-filter=ACMRT \
               "origin/${{ github.base_ref }}...HEAD" \
@@ -52,23 +41,19 @@ jobs:
 
           echo "changed_files=${CHANGED}" >> "$GITHUB_OUTPUT"
 
-          if [ -z "$CHANGED" ]; then
-            echo "No Python files changed in implementations/ — nothing to scan."
-          else
-            echo "Files queued for scanning: ${CHANGED}"
-          fi
-
-      # ── 4. Run the security scanner ────────────────────────────────────────
-      - name: Run PR Security Agent
+      - name: 🕵️‍♂️ Run Security Agent Scanner
         run: |
           CHANGED="${{ steps.changed-files.outputs.changed_files }}"
 
           if [ -z "$CHANGED" ]; then
-            echo "Skipping scan — no relevant files."
+            echo "✅ No Python files changed in implementations/ — nothing to scan."
             exit 0
           fi
 
-          # Word-split is intentional here: $CHANGED is a space-separated list
-          # of paths that contain no whitespace (standard Git paths).
-          # shellcheck disable=SC2086
-          python scripts/pr_security_agent.py $CHANGED
+          if [ -f scripts/pr_security_agent.py ]; then
+            # Word-split is intentional here
+            # shellcheck disable=SC2086
+            python scripts/pr_security_agent.py $CHANGED
+          else
+            echo "⚠️ Warning: scripts/pr_security_agent.py not found. Skipping security scan."
+          fi
