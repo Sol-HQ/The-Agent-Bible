@@ -57,18 +57,69 @@ _DANGEROUS_CALLS: dict[tuple[str | None, str], str] = {
 }
 
 
-def _call_label(node: ast.Call) -> str | None:
+def _collect_import_info(tree: ast.AST) -> tuple[dict[str, str], dict[str, str]]:
+    """Collect simple import/alias information for dangerous modules/functions.
+
+    Returns:
+        module_aliases: maps local module names (including aliases) to
+            canonical module names used in _DANGEROUS_CALLS, e.g. {"o": "os"}.
+        imported_dangerous: maps locally imported function names (including
+            aliases) to their human-readable danger label, e.g.
+            {"run": "subprocess.run", "r": "subprocess.run"}.
+    """
+    module_aliases: dict[str, str] = {}
+    imported_dangerous: dict[str, str] = {}
+
+    dangerous_modules = {mod for (mod, _) in _DANGEROUS_CALLS.keys() if mod is not None}
+
+    for node in ast.walk(tree):
+        # import os as o
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module_name = alias.name.split(".")[0]
+                if module_name in dangerous_modules:
+                    local_name = alias.asname or module_name
+                    module_aliases[local_name] = module_name
+
+        # from subprocess import run as r
+        elif isinstance(node, ast.ImportFrom):
+            if not node.module:
+                continue
+            base_module = node.module.split(".")[0]
+            for alias in node.names:
+                imported_name = alias.name
+                local_name = alias.asname or imported_name
+                label = _DANGEROUS_CALLS.get((base_module, imported_name))
+                if label:
+                    imported_dangerous[local_name] = label
+
+    return module_aliases, imported_dangerous
+
+
+def _call_label(
+    node: ast.Call,
+    module_aliases: dict[str, str],
+    imported_dangerous: dict[str, str],
+) -> str | None:
     """Return a danger label for an AST Call node, or None if it is safe."""
     func = node.func
 
-    # Bare name: eval(...), exec(...), etc.
+    # Bare name: eval(...), exec(...), from-imported dangerous functions, etc.
     if isinstance(func, ast.Name):
-        return _DANGEROUS_CALLS.get((None, func.id))
+        # Built-in dangerous calls (module is None in _DANGEROUS_CALLS)
+        builtin_label = _DANGEROUS_CALLS.get((None, func.id))
+        if builtin_label is not None:
+            return builtin_label
 
-    # Attribute access: os.system(...), subprocess.run(...), etc.
-    if isinstance(func, ast.Attribute):
-        if isinstance(func.value, ast.Name):
-            return _DANGEROUS_CALLS.get((func.value.id, func.attr))
+        # Dangerous functions imported via "from module import name"
+        return imported_dangerous.get(func.id)
+
+    # Attribute access: os.system(...), subprocess.run(...), including aliases
+    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+        base_name = func.value.id
+        # Resolve module alias if present (e.g. o -> os)
+        module_name = module_aliases.get(base_name, base_name)
+        return _DANGEROUS_CALLS.get((module_name, func.attr))
 
     return None
 
@@ -76,9 +127,10 @@ def _call_label(node: ast.Call) -> str | None:
 def _find_dangerous_calls(tree: ast.AST) -> list[tuple[int, str]]:
     """Walk the AST and return (lineno, label) for every dangerous Call."""
     results: list[tuple[int, str]] = []
+    module_aliases, imported_dangerous = _collect_import_info(tree)
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
-            label = _call_label(node)
+            label = _call_label(node, module_aliases, imported_dangerous)
             if label:
                 results.append((node.lineno, label))
     return results
