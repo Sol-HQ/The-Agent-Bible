@@ -1,0 +1,49 @@
+import os
+import sys
+
+# The dangerous functions we want our agent to look for
+DANGEROUS_CALLS = ['os.system', 'subprocess', 'eval', 'exec', 'os.popen']
+# The safeguard we require if they use a dangerous function
+SAFEGUARD = 'input('
+
+def scan_file(filepath):
+    with open(filepath, 'r', encoding='utf-8') as file:
+        content = file.read()
+        
+        # Check if any dangerous calls exist in the code
+        found_danger = [call for call in DANGEROUS_CALLS if call in content]
+        
+        if found_danger:
+            # If danger is found, check if they included a Human-In-The-Loop prompt
+            if SAFEGUARD not in content:
+                print(f"🚨 ALERT: '{filepath}' contains dangerous calls: {found_danger}")
+                print(f"❌ REJECTED: No Human-in-the-Loop safeguard (like `input()`) detected.")
+                return False
+            else:
+                print(f"⚠️ WARNING: '{filepath}' contains {found_danger}, but HITL safeguard `input()` was found. Manual review still recommended.")
+                return True
+                
+    return True
+
+def main():
+    print("🤖 Security Agent waking up... Scanning implementations folder...")
+    implementations_dir = 'implementations'
+    all_safe = True
+    
+    # Walk through all files in the implementations folder
+    for root, _, files in os.walk(implementations_dir):
+        for file in files:
+            if file.endswith('.py'):
+                filepath = os.path.join(root, file)
+                if not scan_file(filepath):
+                    all_safe = False
+
+    if not all_safe:
+        print("\n🛑 SECURITY CHECK FAILED. Agent is blocking this Pull Request.")
+        sys.exit(1) # This tells GitHub to block the merge
+    else:
+        print("\n✅ SECURITY CHECK PASSED. No autonomous destructive commands found.")
+        sys.exit(0) # This tells GitHub the code is safe to review
+
+if __name__ == "__main__":
+    main()
