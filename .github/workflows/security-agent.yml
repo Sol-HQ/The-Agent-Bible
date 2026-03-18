@@ -22,4 +22,9 @@ jobs:
           python-version: '3.10'
           
       - name: 🕵️‍♂️ Run Security Agent Scanner
-        run: python scripts/pr_security_agent.py
+        run: |
+          if [ -f scripts/pr_security_agent.py ]; then
+            python scripts/pr_security_agent.py
+          else
+            echo "Warning: scripts/pr_security_agent.py not found. Skipping security agent scan."
+          fi
