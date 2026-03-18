@@ -56,10 +56,10 @@ def main():
 
     if not all_safe:
         print("\n🛑 SECURITY CHECK FAILED. Agent is blocking this Pull Request.")
-        sys.exit(1) # This tells GitHub to block the merge
+        sys.exit(1)  # Exit with non-zero status to signal a failed security check to the calling CI system
     else:
         print("\n✅ SECURITY CHECK PASSED. No autonomous destructive commands found.")
-        sys.exit(0) # This tells GitHub the code is safe to review
+        sys.exit(0)  # Exit with zero status to signal a successful security check to the calling CI system
 
 if __name__ == "__main__":
     main()
