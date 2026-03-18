@@ -8,6 +8,16 @@ that lack a Human-in-the-Loop (HITL) safeguard (i.e. an ``input()`` call).
 The scanner uses the Python ``ast`` module so that patterns inside comments,
 docstrings, and string literals are **never** flagged as violations.
 
+HITL detection is scope-aware: an ``input()`` call is only accepted as a guard
+when it appears at a strictly earlier line number within the **same function**
+(or at module level) as the dangerous call.  An ``input()`` in an unrelated
+function, or anywhere *after* the dangerous call, is not considered a guard.
+
+Import aliases are fully resolved:
+  * ``import os as o; o.system(...)``           → flagged
+  * ``from subprocess import run; run(...)``    → flagged
+  * ``from subprocess import run as r; r(...)`` → flagged
+
 Usage
 -----
     python scripts/pr_security_agent.py <file1.py> [file2.py ...]
@@ -15,7 +25,7 @@ Usage
 Exit codes
 ----------
   0 — All scanned files passed.
-  1 — One or more files contain a dangerous pattern without an input() guard.
+  1 — One or more files contain a dangerous pattern without a scoped input() guard.
   2 — Unexpected runtime error (e.g. file unreadable or unparseable).
 """
 
@@ -124,37 +134,85 @@ def _call_label(
     return None
 
 
-def _find_dangerous_calls(tree: ast.AST) -> list[tuple[int, str]]:
-    """Walk the AST and return (lineno, label) for every dangerous Call."""
-    results: list[tuple[int, str]] = []
-    module_aliases, imported_dangerous = _collect_import_info(tree)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call):
-            label = _call_label(node, module_aliases, imported_dangerous)
-            if label:
-                results.append((node.lineno, label))
-    return results
+class _ScopeAwareScanner(ast.NodeVisitor):
+    """Walk the AST scope-by-scope to find dangerous calls that lack a
+    preceding ``input()`` guard within the same function (or module-level)
+    scope.
 
-
-def _has_hitl_before(tree: ast.AST, max_lineno: int) -> bool:
-    """Return True if there is a bare ``input(...)`` call at or before ``max_lineno``.
-
-    Only actual Call nodes are checked — ``input`` in comments or strings
-    does **not** count.
+    A dangerous call is considered guarded only when an ``input()`` call
+    appears at a strictly earlier line number **in the same scope**.  An
+    ``input()`` call in a *different* function, or anywhere after the
+    dangerous call, does **not** count.
     """
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call):
-            func = node.func
-            if isinstance(func, ast.Name) and func.id == "input":
-                if getattr(node, "lineno", 0) <= max_lineno:
-                    return True
-    return False
+
+    def __init__(
+        self,
+        module_aliases: dict[str, str],
+        imported_dangerous: dict[str, str],
+    ) -> None:
+        self._module_aliases = module_aliases
+        self._imported_dangerous = imported_dangerous
+        self.violations: list[tuple[int, str]] = []
+        # Each entry in the stack holds the input() line-numbers seen so far
+        # in that scope.  The bottom entry is the module-level scope.
+        self._input_stack: list[list[int]] = [[]]
+
+    # ------------------------------------------------------------------
+    # Scope management
+    # ------------------------------------------------------------------
+
+    def _push_scope(self) -> None:
+        self._input_stack.append([])
+
+    def _pop_scope(self) -> None:
+        self._input_stack.pop()
+
+    def _record_input(self, lineno: int) -> None:
+        self._input_stack[-1].append(lineno)
+
+    def _has_prior_input(self, lineno: int) -> bool:
+        """Return True if any ``input()`` was seen at an earlier line in the
+        current scope."""
+        return any(il < lineno for il in self._input_stack[-1])
+
+    # ------------------------------------------------------------------
+    # Visitors
+    # ------------------------------------------------------------------
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        # Each function body gets its own independent scope.
+        self._push_scope()
+        self.generic_visit(node)
+        self._pop_scope()
+
+    # AsyncFunctionDef uses the same logic as FunctionDef.
+    # The type: ignore suppresses mypy's complaint that the two method
+    # signatures differ slightly in their node type annotations.
+    visit_AsyncFunctionDef = visit_FunctionDef  # type: ignore[assignment]
+
+    def visit_Call(self, node: ast.Call) -> None:
+        func = node.func
+
+        # Record input() before checking for dangerous calls.  When both
+        # share the same line number (e.g. os.system(input("cmd?"))), the
+        # strictly-less-than comparison in _has_prior_input means the
+        # inner input() does *not* count as a guard — which is the
+        # intended behaviour: the argument provides the command, not a
+        # prior human confirmation.
+        if isinstance(func, ast.Name) and func.id == "input":
+            self._record_input(node.lineno)
+
+        label = _call_label(node, self._module_aliases, self._imported_dangerous)
+        if label and not self._has_prior_input(node.lineno):
+            self.violations.append((node.lineno, label))
+
+        self.generic_visit(node)
 
 
 def scan_file(filepath: str) -> list[dict]:
     """Scan a single Python file and return a list of violation dicts.
 
-    Each violation dict has keys: ``file``, ``line``, ``label``.
+    Each violation dict has keys: ``file``, ``line``, ``code``, ``label``.
     An empty list means the file passed the check.
     """
     path = Path(filepath)
@@ -182,21 +240,23 @@ def scan_file(filepath: str) -> list[dict]:
         )
         sys.exit(2)
 
+    module_aliases, imported_dangerous = _collect_import_info(tree)
+    scanner = _ScopeAwareScanner(module_aliases, imported_dangerous)
+    scanner.visit(tree)
+
     source_lines = source.splitlines()
     violations: list[dict] = []
 
-    for lineno, label in _find_dangerous_calls(tree):
-        # Require a preceding input() call as a HITL guard for each dangerous call.
-        if not _has_hitl_before(tree, lineno):
-            code = source_lines[lineno - 1].strip() if lineno <= len(source_lines) else ""
-            violations.append(
-                {
-                    "file": filepath,
-                    "line": lineno,
-                    "code": code,
-                    "label": label,
-                }
-            )
+    for lineno, label in scanner.violations:
+        code = source_lines[lineno - 1].strip() if lineno <= len(source_lines) else ""
+        violations.append(
+            {
+                "file": filepath,
+                "line": lineno,
+                "code": code,
+                "label": label,
+            }
+        )
 
     return violations
 
@@ -243,3 +303,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
