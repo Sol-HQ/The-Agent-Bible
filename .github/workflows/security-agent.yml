@@ -1,0 +1,23 @@
+name: 🛡️ Automated Security Agent
+
+# This tells the agent to wake up whenever a Pull Request is opened or updated
+on:
+  pull_request:
+    paths:
+      - 'implementations/**/*.py'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout repository code
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: 🕵️‍♂️ Run Security Agent Scanner
+        run: python scripts/pr_security_agent.py
