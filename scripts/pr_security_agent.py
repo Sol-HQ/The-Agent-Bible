@@ -136,8 +136,8 @@ def _find_dangerous_calls(tree: ast.AST) -> list[tuple[int, str]]:
     return results
 
 
-def _has_hitl(tree: ast.AST) -> bool:
-    """Return True if the AST contains at least one bare ``input(...)`` call.
+def _has_hitl_before(tree: ast.AST, max_lineno: int) -> bool:
+    """Return True if there is a bare ``input(...)`` call at or before ``max_lineno``.
 
     Only actual Call nodes are checked — ``input`` in comments or strings
     does **not** count.
@@ -146,7 +146,8 @@ def _has_hitl(tree: ast.AST) -> bool:
         if isinstance(node, ast.Call):
             func = node.func
             if isinstance(func, ast.Name) and func.id == "input":
-                return True
+                if getattr(node, "lineno", 0) <= max_lineno:
+                    return True
     return False
 
 
@@ -181,23 +182,21 @@ def scan_file(filepath: str) -> list[dict]:
         )
         sys.exit(2)
 
-    # Fast-path: a file that already has an input() call anywhere passes.
-    if _has_hitl(tree):
-        return []
-
     source_lines = source.splitlines()
     violations: list[dict] = []
 
     for lineno, label in _find_dangerous_calls(tree):
-        code = source_lines[lineno - 1].strip() if lineno <= len(source_lines) else ""
-        violations.append(
-            {
-                "file": filepath,
-                "line": lineno,
-                "code": code,
-                "label": label,
-            }
-        )
+        # Require a preceding input() call as a HITL guard for each dangerous call.
+        if not _has_hitl_before(tree, lineno):
+            code = source_lines[lineno - 1].strip() if lineno <= len(source_lines) else ""
+            violations.append(
+                {
+                    "file": filepath,
+                    "line": lineno,
+                    "code": code,
+                    "label": label,
+                }
+            )
 
     return violations
 
