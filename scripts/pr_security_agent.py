@@ -7,22 +7,26 @@ DANGEROUS_CALLS = ['os.system', 'subprocess', 'eval', 'exec', 'os.popen']
 SAFEGUARD = 'input('
 
 def scan_file(filepath):
-    with open(filepath, 'r', encoding='utf-8') as file:
-        content = file.read()
-        
-        # Check if any dangerous calls exist in the code
-        found_danger = [call for call in DANGEROUS_CALLS if call in content]
-        
-        if found_danger:
-            # If danger is found, check if they included a Human-In-The-Loop prompt
-            if SAFEGUARD not in content:
-                print(f"🚨 ALERT: '{filepath}' contains dangerous calls: {found_danger}")
-                print(f"❌ REJECTED: No Human-in-the-Loop safeguard (like `input()`) detected.")
-                return False
-            else:
-                print(f"⚠️ WARNING: '{filepath}' contains {found_danger}, but HITL safeguard `input()` was found. Manual review still recommended.")
-                return True
-                
+    try:
+        with open(filepath, 'r', encoding='utf-8') as file:
+            content = file.read()
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"❌ REJECTED: Could not read file '{filepath}' ({e}). Treating as failed security check.")
+        return False
+
+    # Check if any dangerous calls exist in the code
+    found_danger = [call for call in DANGEROUS_CALLS if call in content]
+
+    if found_danger:
+        # If danger is found, check if they included a Human-In-The-Loop prompt
+        if SAFEGUARD not in content:
+            print(f"🚨 ALERT: '{filepath}' contains dangerous calls: {found_danger}")
+            print(f"❌ REJECTED: No Human-in-the-Loop safeguard (like `input()`) detected.")
+            return False
+        else:
+            print(f"⚠️ WARNING: '{filepath}' contains {found_danger}, but HITL safeguard `input()` was found. Manual review still recommended.")
+            return True
+
     return True
 
 def main():
