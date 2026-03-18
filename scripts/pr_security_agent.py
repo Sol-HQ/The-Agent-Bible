@@ -31,7 +31,19 @@ def scan_file(filepath):
 
 def main():
     print("🤖 Security Agent waking up... Scanning implementations folder...")
-    implementations_dir = 'implementations'
+    # Determine the implementations directory:
+    # - If a directory is provided as the first CLI argument, use that.
+    # - Otherwise, default to the 'implementations' directory next to this script.
+    if len(sys.argv) > 1:
+        implementations_dir = sys.argv[1]
+    else:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        implementations_dir = os.path.join(script_dir, 'implementations')
+
+    if not os.path.isdir(implementations_dir):
+        print(f"🛑 ERROR: Implementations directory '{implementations_dir}' does not exist.")
+        sys.exit(1)
+
     all_safe = True
     
     # Walk through all files in the implementations folder
