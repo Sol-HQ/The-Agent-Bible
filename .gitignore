@@ -85,3 +85,10 @@ logs/
 tmp/
 temp/
 scratch/
+
+# Agent memory / local state databases
+.chroma/
+*.sqlite
+*.sqlite3
+*.db
+agent_memory/

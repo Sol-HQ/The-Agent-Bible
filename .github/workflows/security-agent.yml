@@ -42,18 +42,20 @@ jobs:
           echo "changed_files=${CHANGED}" >> "$GITHUB_OUTPUT"
 
       - name: 🕵️‍♂️ Run Security Agent Scanner
+        # SECURITY: pass the output through an env-var, NOT via ${{ }} template
+        # interpolation inside the shell body, to prevent script injection.
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.changed_files }}
         run: |
-          CHANGED="${{ steps.changed-files.outputs.changed_files }}"
-
-          if [ -z "$CHANGED" ]; then
+          if [ -z "$CHANGED_FILES" ]; then
             echo "✅ No Python files changed in implementations/ — nothing to scan."
             exit 0
           fi
 
           if [ -f scripts/pr_security_agent.py ]; then
-            # Word-split is intentional here
+            # Word-split is intentional: CHANGED_FILES is space-separated paths
             # shellcheck disable=SC2086
-            python scripts/pr_security_agent.py $CHANGED
+            python scripts/pr_security_agent.py $CHANGED_FILES
           else
             echo "⚠️ Warning: scripts/pr_security_agent.py not found. Skipping security scan."
           fi
