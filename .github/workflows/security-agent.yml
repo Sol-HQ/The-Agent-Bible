@@ -6,25 +6,54 @@ on:
     paths:
       - 'implementations/**/*.py'
 
+permissions:
+  contents: read
+
 jobs:
   security-scan:
+    name: Scan for Dangerous Commands Without HITL Safeguards
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     
     steps:
       - name: 📥 Checkout repository code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
         
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
           
+      - name: 🔍 Identify changed Python files
+        id: changed-files
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+
+          # Collect .py files under implementations/ that were Added or Modified
+          CHANGED=$(
+            git diff --name-only --diff-filter=ACMRT \
+              "origin/${{ github.base_ref }}...HEAD" \
+            | grep '^implementations/.*\.py$' \
+            | tr '\n' ' ' \
+            || true
+          )
+
+          echo "changed_files=${CHANGED}" >> "$GITHUB_OUTPUT"
+
       - name: 🕵️‍♂️ Run Security Agent Scanner
         run: |
+          CHANGED="${{ steps.changed-files.outputs.changed_files }}"
+
+          if [ -z "$CHANGED" ]; then
+            echo "✅ No Python files changed in implementations/ — nothing to scan."
+            exit 0
+          fi
+
           if [ -f scripts/pr_security_agent.py ]; then
-            python scripts/pr_security_agent.py
+            # Word-split is intentional here
+            # shellcheck disable=SC2086
+            python scripts/pr_security_agent.py $CHANGED
           else
-            echo "Warning: scripts/pr_security_agent.py not found. Skipping security agent scan."
+            echo "⚠️ Warning: scripts/pr_security_agent.py not found. Skipping security scan."
           fi
