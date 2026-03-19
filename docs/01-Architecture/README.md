@@ -40,4 +40,4 @@ This is where the agent touches the real world.
 
 The "Cline Hack" happened because the **Perception** pillar was fed poisoned data that overrode the **Reasoning** pillar. In the next chapters, we will learn how to build "Guardrails" between these pillars.
 
-**Next up:** [Chapter 02 - Memory & RAG](../02-Memory-RAG/README.md)
+**Next up:** [Chapter 02 - Memory & RAG](../02-Memory-Systems/README.md)
