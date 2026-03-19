@@ -37,7 +37,7 @@ An extension of LangChain that models agent workflows as directed graphs (nodes 
 ### CrewAI
 CrewAI frames multi-agent work as a "crew" of specialized agents each with a **Role**, **Goal**, and **Backstory**. Agents are assigned **Tasks** and collaborate sequentially or in parallel.
 
-**When to use:** Your problem decomposes naturally into parallel specialised sub-tasks (e.g., a "Researcher" + "Writer" + "Editor" crew for content generation).
+**When to use:** Your problem decomposes naturally into parallel specialized sub-tasks (e.g., a "Researcher" + "Writer" + "Editor" crew for content generation).
 
 ### Raw API (The Bible Approach)
 For learning and for maximum control, the implementations in this repository use the raw OpenAI API directly. This means:
