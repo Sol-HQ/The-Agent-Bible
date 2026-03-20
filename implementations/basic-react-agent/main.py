@@ -1,6 +1,6 @@
 import os
 import re
-from openai import OpenAI
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables (like OPENAI_API_KEY) from a .env file
@@ -61,7 +61,8 @@ ANSWER: The answer is 208,728.
 # 3. THE EXECUTION LOOP (The Agent's Heartbeat)
 # ---------------------------------------------------------------------------
 def run_agent(user_query: str):
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    # Use local OpenAI-compatible endpoint (Ollama) via HTTP
+    base = os.getenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
     
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -72,13 +73,23 @@ def run_agent(user_query: str):
     
     # The Agent Loop: Allow the agent to think and act up to 5 times
     for step in range(5):
-        response = client.chat.completions.create(
-            model="gpt-4o", # Or gpt-3.5-turbo if you want to save pennies
-            messages=messages,
-            stop=["PAUSE"] # The LLM will stop generating when it types PAUSE
-        )
-        
-        reply = response.choices[0].message.content.strip()
+        # call local Ollama-compatible chat completions endpoint
+        try:
+            resp = requests.post(f"{base}/chat/completions", json={"model": "gpt-4o", "messages": messages, "stop": ["PAUSE"]}, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            reply = None
+            if isinstance(data, dict) and data.get("choices"):
+                choice = data["choices"][0]
+                if isinstance(choice, dict) and "message" in choice:
+                    reply = choice["message"].get("content", "").strip()
+                elif isinstance(choice, dict) and "text" in choice:
+                    reply = choice.get("text", "").strip()
+            if reply is None:
+                reply = str(data)
+        except Exception as e:
+            print(f"Local model call failed: {e}")
+            return
         print(f"\n{reply}")
         messages.append({"role": "assistant", "content": reply})
         

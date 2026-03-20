@@ -92,3 +92,6 @@ scratch/
 *.sqlite3
 *.db
 agent_memory/
+brain-material/
+models/
+implementations/local-sovereign-agent/models/
