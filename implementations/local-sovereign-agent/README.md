@@ -10,6 +10,7 @@ Quick notes:
 ```bash
 python3 -m pip install -r implementations/local_sovereign_agent/requirements-full.txt
 ```
+```
 
 - To prefetch the embedding model for offline use:
 

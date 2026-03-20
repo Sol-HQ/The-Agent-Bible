@@ -114,6 +114,7 @@ with st.sidebar:
             st.write(f"Last indexed: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last))}")
         else:
             st.write("Last indexed: never")
+<<<<<<< Updated upstream
         # Small visible graph: vault doc count and memory facts
         vault_count = status.get('count', 0)
         mem_count = len(memory_df) if not memory_df.empty else 0
@@ -133,6 +134,8 @@ with st.sidebar:
         fig.savefig(buf, format="png")
         st.image(buf.getvalue(), width=180)
         plt.close(fig)
+=======
+>>>>>>> Stashed changes
     except Exception as e:
         st.write("Vault status: error")
 
