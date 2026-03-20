@@ -12,7 +12,7 @@ import sys
 
 MODEL_NAME = os.getenv("EMBED_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
 BASE = Path(__file__).resolve().parents[1]
-BRAIN_DIR = BASE / "implementations" / "local-sovereign-agent" / "brain-material"
+BRAIN_DIR = BASE / "implementations" / "local_sovereign_agent" / "brain-material"
 LOCAL_DIR = os.getenv("EMBED_LOCAL_DIR", str(BRAIN_DIR / "embed_model"))
 
 def main():

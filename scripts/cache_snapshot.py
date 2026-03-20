@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 BASE = os.path.dirname(os.path.dirname(__file__))
-BRAIN_DIR = os.path.join(BASE, "implementations", "local-sovereign-agent", "brain-material")
+BRAIN_DIR = os.path.join(BASE, "implementations", "local_sovereign_agent", "brain-material")
 os.makedirs(BRAIN_DIR, exist_ok=True)
 
 def sanitize_filename(s: str) -> str:

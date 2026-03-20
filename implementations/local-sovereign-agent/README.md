@@ -4,11 +4,11 @@ This folder contains a local-first agent implementation that runs against a loca
 
 Quick notes:
 
-- Drop a local model archive or unpacked model directory into `implementations/local-sovereign-agent/models/` and use the **Import** button in the Streamlit UI or run `import_model.sh` to register it with Ollama.
+- Drop a local model archive or unpacked model directory into `implementations/local-sovereign-agent/models/` or `implementations/local_sovereign_agent/models/` and use the **Import** button in the Streamlit UI or run `import_model.sh` to register it with Ollama.
 - The default `requirements.txt` is deliberately lightweight. If you want full RAG/embedding features, install `requirements-full.txt`:
 
 ```bash
-python3 -m pip install -r implementations/local-sovereign-agent/requirements-full.txt
+python3 -m pip install -r implementations/local_sovereign_agent/requirements-full.txt
 ```
 
 - To prefetch the embedding model for offline use:

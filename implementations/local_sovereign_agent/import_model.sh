@@ -17,7 +17,6 @@ fi
 
 echo "[import_model] Source: $MODEL_SRC  Name: $MODEL_NAME"
 
-# Try common import invocation patterns; be permissive and show helpful logs
 TMP_OUT="/tmp/ollama_import_out"
 echo "Attempting: ollama import \"$MODEL_SRC\" --name \"$MODEL_NAME\""
 if ollama import "$MODEL_SRC" --name "$MODEL_NAME" > "$TMP_OUT" 2>&1; then
@@ -39,5 +38,5 @@ fi
 
 echo "Import failed. See $TMP_OUT for details. If you have a local model archive, try:"
 echo "  ollama import /path/to/model.tar --name my-model"
-echo "Or place unpacked model files under 'implementations/local-sovereign-agent/models/' or 'implementations/local_sovereign_agent/models/' and re-run this script."
+echo "Or place unpacked model files under 'implementations/local_sovereign_agent/models/' and re-run this script."
 exit 3

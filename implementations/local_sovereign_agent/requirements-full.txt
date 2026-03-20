@@ -1,0 +1,10 @@
+streamlit
+python-dotenv
+pandas
+requests
+chromadb
+sentence-transformers
+beautifulsoup4
+duckdb
+tqdm
+faiss-cpu

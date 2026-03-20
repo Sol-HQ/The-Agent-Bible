@@ -20,6 +20,8 @@ sys.path.insert(0, BASE_DIR)
 import brain_index
 import subprocess
 import glob
+import matplotlib.pyplot as plt
+import io
 
 # ensure brain-material exists and begin indexing in background
 brain_index.ensure_dirs()
@@ -112,6 +114,25 @@ with st.sidebar:
             st.write(f"Last indexed: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last))}")
         else:
             st.write("Last indexed: never")
+        # Small visible graph: vault doc count and memory facts
+        vault_count = status.get('count', 0)
+        mem_count = len(memory_df) if not memory_df.empty else 0
+        fig, ax = plt.subplots(figsize=(2.5, 1.5))
+        bars = ax.bar(['Vault', 'Memory'], [vault_count, mem_count], color=['#4b8bbe', '#ffd43b'])
+        ax.set_ylabel('Count')
+        ax.set_title('Agent Stats')
+        for bar in bars:
+            height = bar.get_height()
+            ax.annotate(f'{int(height)}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom', fontsize=8)
+        buf = io.BytesIO()
+        fig.tight_layout()
+        fig.savefig(buf, format="png")
+        st.image(buf.getvalue(), width=180)
+        plt.close(fig)
     except Exception as e:
         st.write("Vault status: error")
 

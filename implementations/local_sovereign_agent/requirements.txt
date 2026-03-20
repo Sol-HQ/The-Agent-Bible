@@ -1,0 +1,9 @@
+streamlit
+python-dotenv
+pandas
+requests
+beautifulsoup4
+tqdm
+
+# NOTE: heavy/optional packages (torch, sentence-transformers, chromadb, faiss)
+# are available in requirements-full.txt
