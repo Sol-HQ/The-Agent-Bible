@@ -96,3 +96,4 @@ brain-material/
 models/
 implementations/local-sovereign-agent/models/
 implementations/local_sovereign_agent/models/
+local.env
